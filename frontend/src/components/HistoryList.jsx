@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react'
 import { fetchAnalyses, fetchAnalysis } from '../api/resume'
 
+/** Score-tier color, matched to the token palette in index.css. */
+function sealColor(score) {
+  if (score >= 80) return 'var(--accent-teal)'
+  if (score >= 50) return 'var(--accent-ochre)'
+  return 'var(--accent-brick)'
+}
+
 /** Lists past analyses; selecting one fetches its full record via onSelect. */
 export default function HistoryList({ onSelect }) {
   const [status, setStatus] = useState('loading') // loading | success | error
@@ -43,31 +50,39 @@ export default function HistoryList({ onSelect }) {
     }
   }
 
-  if (status === 'loading') return <p>Loading history…</p>
+  if (status === 'loading') return <p className="empty-note">Loading history…</p>
 
   return (
     <div>
-      <h2>Past Analyses</h2>
+      <h2 className="ledger-title">Past reviews</h2>
 
       {error && (
-        <p style={{ color: 'red' }}>
-          <strong>Error:</strong> {error}
+        <p className="form-flag">
+          <span>{error}</span>
         </p>
       )}
 
-      {status === 'success' && items.length === 0 && <p>No past analyses yet.</p>}
+      {status === 'success' && items.length === 0 && (
+        <p className="empty-note">No reviews yet. Run your first one to see it here.</p>
+      )}
 
       {items.length > 0 && (
-        <ul style={{ listStyle: 'none', padding: 0 }}>
+        <div className="ledger">
           {items.map((item) => (
-            <li key={item.id} style={{ marginBottom: '0.5rem' }}>
-              <button onClick={() => handleSelect(item.id)} disabled={loadingId === item.id}>
-                {new Date(item.created_at).toLocaleString()} — {item.resume_filename} —{' '}
-                {item.score}/100 ({item.score_label})
-              </button>
-            </li>
+            <button
+              key={item.id}
+              className="ledger-row"
+              onClick={() => handleSelect(item.id)}
+              disabled={loadingId === item.id}
+            >
+              <span className="ledger-filename">{item.resume_filename}</span>
+              <span className="ledger-date">{new Date(item.created_at).toLocaleString()}</span>
+              <span className="ledger-score" style={{ '--seal-color': sealColor(item.score) }}>
+                {item.score}/100 — {item.score_label}
+              </span>
+            </button>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   )

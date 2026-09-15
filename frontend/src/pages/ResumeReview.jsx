@@ -9,8 +9,10 @@ export default function ResumeReview() {
   if (record) {
     return (
       <div>
+        <button className="btn-quiet report-back" onClick={() => setRecord(null)}>
+          ← Review another resume
+        </button>
         <AnalysisReport record={record} />
-        <button onClick={() => setRecord(null)}>Analyze another resume</button>
       </div>
     )
   }

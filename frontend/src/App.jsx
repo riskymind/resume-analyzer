@@ -13,25 +13,34 @@ export default function App() {
   }
 
   return (
-    <div style={{ fontFamily: 'sans-serif', padding: '2rem', maxWidth: 720, margin: '0 auto' }}>
-      <h1>Resume Analyzer</h1>
-
-      <nav style={{ marginBottom: '1.5rem' }}>
-        <button onClick={() => selectTab('new')} disabled={tab === 'new'}>
-          New Analysis
-        </button>{' '}
-        <button onClick={() => selectTab('history')} disabled={tab === 'history'}>
-          History
-        </button>
-      </nav>
+    <div className="app-shell">
+      <header className="app-header">
+        <span className="app-wordmark">Resume Analyzer</span>
+        <nav className="app-nav">
+          <button
+            className={tab === 'new' ? 'is-active' : ''}
+            onClick={() => selectTab('new')}
+          >
+            New review
+          </button>
+          <button
+            className={tab === 'history' ? 'is-active' : ''}
+            onClick={() => selectTab('history')}
+          >
+            History
+          </button>
+        </nav>
+      </header>
 
       {tab === 'new' && <ResumeReview />}
 
       {tab === 'history' &&
         (historyRecord ? (
           <div>
+            <button className="btn-quiet report-back" onClick={() => setHistoryRecord(null)}>
+              ← Back to history
+            </button>
             <AnalysisReport record={historyRecord} />
-            <button onClick={() => setHistoryRecord(null)}>Back to history</button>
           </div>
         ) : (
           <HistoryList onSelect={setHistoryRecord} />

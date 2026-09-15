@@ -1,0 +1,475 @@
+/* ==========================================================================
+   Resume Analyzer — design tokens & base styles
+
+   Concept: the app reads like an editor's review desk — a resume and a job
+   posting laid side by side, marked up and graded the way an attentive human
+   reviewer would, rather than a generic dashboard. Paper tones, hairline
+   rules and a stamped score seal carry that idea through every screen.
+   ========================================================================== */
+
+:root {
+  /* Color */
+  --paper: #efeee5;
+  --paper-raised: #faf9f3;
+  --ink: #21261f;
+  --ink-soft: #5b6156;
+  --rule: #d7d1bd;
+  --rule-strong: #b9b298;
+  --accent-teal: #2e6f5e;
+  --accent-teal-ink: #1f4d40;
+  --accent-ochre: #8a5e17;
+  --accent-brick: #a23b2e;
+
+  /* Type */
+  --font-serif: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+  --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius: 5px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  margin: 0;
+  color: var(--ink);
+}
+
+p {
+  margin: 0;
+}
+
+button {
+  font-family: inherit;
+}
+
+textarea,
+input {
+  font-family: inherit;
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-teal);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   Shell
+   ------------------------------------------------------------------------- */
+
+.app-shell {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 5rem;
+}
+
+.app-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding-bottom: 1.75rem;
+  margin-bottom: 2.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.app-wordmark {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1.6rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.app-nav {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.app-nav button {
+  background: none;
+  border: none;
+  padding: 0.2rem 0 0.4rem;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.app-nav button:hover {
+  color: var(--ink);
+}
+
+.app-nav button.is-active {
+  color: var(--ink);
+  border-bottom-color: var(--accent-teal);
+}
+
+/* -------------------------------------------------------------------------
+   Upload form — the "two documents on a desk" layout
+   ------------------------------------------------------------------------- */
+
+.intake-intro {
+  font-family: var(--font-serif);
+  font-size: 1.4rem;
+  line-height: 1.4;
+  max-width: 34ch;
+  margin-bottom: 2.25rem;
+  color: var(--ink);
+}
+
+.document-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1.75rem;
+}
+
+@media (max-width: 560px) {
+  .document-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.document-panel {
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--ink);
+  background: var(--paper-raised);
+  padding: 1.1rem 1.1rem 1.25rem;
+  border-radius: var(--radius);
+}
+
+.document-panel h3 {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1.05rem;
+  font-weight: 500;
+  margin-bottom: 0.15rem;
+}
+
+.document-panel .panel-hint {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin-bottom: 0.85rem;
+}
+
+.file-drop {
+  display: block;
+  border: 1px dashed var(--rule-strong);
+  border-radius: var(--radius);
+  padding: 0.9rem 0.75rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+  background: var(--paper);
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.file-drop:hover {
+  border-color: var(--accent-teal);
+  color: var(--ink);
+}
+
+.file-drop input {
+  display: none;
+}
+
+.file-drop.has-file {
+  border-style: solid;
+  border-color: var(--accent-teal);
+  color: var(--ink);
+  background: var(--paper-raised);
+}
+
+.mode-tabs {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.mode-tabs button {
+  background: none;
+  border: none;
+  padding: 0.1rem 0 0.3rem;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.mode-tabs button.is-active {
+  color: var(--ink);
+  border-bottom-color: var(--accent-ochre);
+}
+
+.jd-textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.65rem 0.75rem;
+  font-size: 0.9rem;
+  background: var(--paper);
+  line-height: 1.55;
+}
+
+.jd-textarea:focus-visible {
+  border-color: var(--accent-teal);
+}
+
+.submit-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.btn-primary {
+  background: var(--ink);
+  color: var(--paper-raised);
+  border: none;
+  border-radius: var(--radius);
+  padding: 0.75rem 1.6rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-teal-ink);
+}
+
+.btn-primary:disabled {
+  background: var(--rule-strong);
+  cursor: progress;
+}
+
+.btn-quiet {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.btn-quiet:hover {
+  color: var(--ink);
+}
+
+.form-flag {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  border-left: 3px solid var(--accent-brick);
+  background: var(--paper-raised);
+  padding: 0.6rem 0.85rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.88rem;
+  color: var(--ink);
+}
+
+/* -------------------------------------------------------------------------
+   Analysis report — score seal + ledger rows
+   ------------------------------------------------------------------------- */
+
+.report-back {
+  margin-bottom: 1.5rem;
+}
+
+.report-head {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.score-seal {
+  flex-shrink: 0;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  border: 2px solid var(--seal-color, var(--accent-teal));
+  color: var(--seal-color, var(--accent-teal));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+}
+
+.score-seal .score-value {
+  font-size: 1.9rem;
+  line-height: 1;
+  font-weight: 600;
+}
+
+.score-seal .score-max {
+  font-size: 0.65rem;
+  color: var(--ink-soft);
+  margin-top: 0.15rem;
+}
+
+.report-head-text h2 {
+  font-style: italic;
+  font-size: 1.3rem;
+  margin-bottom: 0.3rem;
+}
+
+.report-meta {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.report-source {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  padding-bottom: 1.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.report-row {
+  display: grid;
+  grid-template-columns: 11rem 1fr;
+  gap: 1.25rem;
+  padding: 1.1rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.report-row:last-child {
+  border-bottom: none;
+}
+
+@media (max-width: 560px) {
+  .report-row {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+  }
+}
+
+.report-row h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  color: var(--ink);
+}
+
+.report-row ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.report-row li {
+  margin-bottom: 0.4rem;
+  font-size: 0.92rem;
+}
+
+.report-row li:last-child {
+  margin-bottom: 0;
+}
+
+.report-row .none {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+/* -------------------------------------------------------------------------
+   History — a ledger of past reviews
+   ------------------------------------------------------------------------- */
+
+.ledger-title {
+  font-style: italic;
+  font-size: 1.3rem;
+  margin-bottom: 1.25rem;
+}
+
+.ledger {
+  border-top: 1px solid var(--rule);
+}
+
+.ledger-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 1rem;
+  align-items: center;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--rule);
+  padding: 0.9rem 0.25rem;
+  font-size: 0.92rem;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.ledger-row:hover:not(:disabled) {
+  background: var(--paper-raised);
+}
+
+.ledger-row:disabled {
+  color: var(--ink-soft);
+  cursor: progress;
+}
+
+@media (max-width: 560px) {
+  .ledger-row {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+  }
+}
+
+.ledger-filename {
+  font-weight: 500;
+}
+
+.ledger-date {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+
+.ledger-score {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--seal-color, var(--ink));
+  white-space: nowrap;
+}
+
+.empty-note {
+  color: var(--ink-soft);
+  font-style: italic;
+  padding: 1rem 0;
+}
