@@ -44,7 +44,7 @@ export default function ResumeUploadForm({ onAnalyzed }) {
 
     if (jdMode === 'text') {
       if (!jdText.trim()) {
-        setError('Please paste a job description, or switch to file upload.')
+        setError('Paste a job description, or switch to file upload.')
         return
       }
     } else {
@@ -72,69 +72,76 @@ export default function ResumeUploadForm({ onAnalyzed }) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <div style={{ marginBottom: '1rem' }}>
-        <label htmlFor="resume-file">
-          <strong>Resume</strong> (.pdf or .md)
-        </label>
-        <br />
-        <input
-          id="resume-file"
-          type="file"
-          accept=".pdf,.md"
-          onChange={(e) => setResumeFile(e.target.files[0] ?? null)}
-        />
-      </div>
+      <p className="intake-intro">
+        Bring your resume and the job posting. We'll mark it up like an editor would.
+      </p>
 
-      <div style={{ marginBottom: '1rem' }}>
-        <strong>Job description</strong>
-        <br />
-        <label style={{ marginRight: '1rem' }}>
-          <input
-            type="radio"
-            name="jd-mode"
-            checked={jdMode === 'text'}
-            onChange={() => setJdMode('text')}
-          />{' '}
-          Paste text
-        </label>
-        <label>
-          <input
-            type="radio"
-            name="jd-mode"
-            checked={jdMode === 'file'}
-            onChange={() => setJdMode('file')}
-          />{' '}
-          Upload file
-        </label>
-        <br />
+      <div className="document-grid">
+        <div className="document-panel">
+          <h3>Resume</h3>
+          <p className="panel-hint">.pdf or .md, up to 5MB</p>
+          <label className={`file-drop ${resumeFile ? 'has-file' : ''}`}>
+            <input
+              type="file"
+              accept=".pdf,.md"
+              onChange={(e) => setResumeFile(e.target.files[0] ?? null)}
+            />
+            {resumeFile ? resumeFile.name : 'Choose file…'}
+          </label>
+        </div>
 
-        {jdMode === 'text' ? (
-          <textarea
-            rows={8}
-            style={{ width: '100%', marginTop: '0.5rem' }}
-            placeholder="Paste the job description here…"
-            value={jdText}
-            onChange={(e) => setJdText(e.target.value)}
-          />
-        ) : (
-          <input
-            type="file"
-            accept=".pdf,.md"
-            style={{ marginTop: '0.5rem' }}
-            onChange={(e) => setJdFile(e.target.files[0] ?? null)}
-          />
-        )}
+        <div className="document-panel">
+          <h3>Job description</h3>
+          <p className="panel-hint">Paste it in, or attach the posting</p>
+          <div className="mode-tabs">
+            <button
+              type="button"
+              className={jdMode === 'text' ? 'is-active' : ''}
+              onClick={() => setJdMode('text')}
+            >
+              Paste text
+            </button>
+            <button
+              type="button"
+              className={jdMode === 'file' ? 'is-active' : ''}
+              onClick={() => setJdMode('file')}
+            >
+              Upload file
+            </button>
+          </div>
+
+          {jdMode === 'text' ? (
+            <textarea
+              className="jd-textarea"
+              rows={6}
+              placeholder="Paste the job description here…"
+              value={jdText}
+              onChange={(e) => setJdText(e.target.value)}
+            />
+          ) : (
+            <label className={`file-drop ${jdFile ? 'has-file' : ''}`}>
+              <input
+                type="file"
+                accept=".pdf,.md"
+                onChange={(e) => setJdFile(e.target.files[0] ?? null)}
+              />
+              {jdFile ? jdFile.name : 'Choose file…'}
+            </label>
+          )}
+        </div>
       </div>
 
       {error && (
-        <p style={{ color: 'red' }}>
-          <strong>Error:</strong> {error}
+        <p className="form-flag">
+          <span>{error}</span>
         </p>
       )}
 
-      <button type="submit" disabled={status === 'submitting'}>
-        {status === 'submitting' ? 'Analyzing…' : 'Analyze'}
-      </button>
+      <div className="submit-row">
+        <button className="btn-primary" type="submit" disabled={status === 'submitting'}>
+          {status === 'submitting' ? 'Reviewing…' : 'Review resume'}
+        </button>
+      </div>
     </form>
   )
 }

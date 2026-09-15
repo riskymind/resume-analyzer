@@ -1,8 +1,15 @@
 const CATEGORY_LABELS = {
-  missing_keywords: 'Missing Keywords',
-  phrasing_suggestions: 'Phrasing Suggestions',
-  skill_gaps: 'Skill Gaps',
-  formatting_notes: 'Formatting Notes',
+  missing_keywords: 'Missing keywords',
+  phrasing_suggestions: 'Phrasing suggestions',
+  skill_gaps: 'Skill gaps',
+  formatting_notes: 'Formatting notes',
+}
+
+/** Score-tier color, matched to the token palette in index.css. */
+function sealColor(score) {
+  if (score >= 80) return 'var(--accent-teal)'
+  if (score >= 50) return 'var(--accent-ochre)'
+  return 'var(--accent-brick)'
 }
 
 /** Renders a fitment score and its recommendation categories for one analysis record. */
@@ -11,22 +18,25 @@ export default function AnalysisReport({ record }) {
 
   return (
     <section>
-      <h2>Analysis Report</h2>
-      <p>
-        <strong>{resumeFilename}</strong> vs. job description (
-        {jdSource === 'pasted' ? 'pasted text' : jdSource})
-        {createdAt && <> — {new Date(createdAt).toLocaleString()}</>}
-      </p>
+      <div className="report-head">
+        <div className="score-seal" style={{ '--seal-color': sealColor(result.score) }}>
+          <span className="score-value">{result.score}</span>
+          <span className="score-max">/ 100</span>
+        </div>
+        <div className="report-head-text">
+          <h2>{result.score_label}</h2>
+          <p className="report-meta">
+            {resumeFilename} vs. {jdSource === 'pasted' ? 'pasted job description' : jdSource}
+          </p>
+        </div>
+      </div>
 
-      <p>
-        <span style={{ fontSize: '2rem', fontWeight: 'bold' }}>{result.score}</span>
-        <span>/100 — {result.score_label}</span>
-      </p>
+      {createdAt && <p className="report-source">Reviewed {new Date(createdAt).toLocaleString()}</p>}
 
       {Object.entries(CATEGORY_LABELS).map(([key, label]) => {
         const items = result.recommendations[key] ?? []
         return (
-          <div key={key} style={{ marginBottom: '1rem' }}>
+          <div key={key} className="report-row">
             <h3>{label}</h3>
             {items.length > 0 ? (
               <ul>
@@ -35,7 +45,7 @@ export default function AnalysisReport({ record }) {
                 ))}
               </ul>
             ) : (
-              <p>None</p>
+              <p className="none">None</p>
             )}
           </div>
         )
