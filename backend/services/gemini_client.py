@@ -6,7 +6,7 @@ import os
 
 import google.generativeai as genai
 
-GEMINI_MODEL = "gemini-1.5-flash"
+GEMINI_MODEL = "gemini-3.6-flash"
 
 
 class GeminiClientError(Exception):
