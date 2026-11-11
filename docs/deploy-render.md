@@ -14,8 +14,8 @@ The Blueprint [`render.yaml`](../render.yaml) defines:
 
 | Resource | Type | Key settings |
 |---|---|---|
-| `resume-analyzer-api` | Web service, `runtime: docker` | `dockerContext: ./backend`, `dockerfilePath: ./backend/Dockerfile`, plan `starter`, region `oregon`, `healthCheckPath: /api/v1/health`, `preDeployCommand: python -m app.cli migrate`, `autoDeployTrigger: "off"`, `maxShutdownDelaySeconds: 120`, `buildFilter` on `backend/**` |
-| `resume-analyzer-db` | PostgreSQL 16 | plan `basic-256mb`, region `oregon`, database `resume_analyzer`, user `resume`, `ipAllowList: []` (no external connections) |
+| `resume-analyzer-api` | Web service, `runtime: docker` | `dockerContext: ./backend`, `dockerfilePath: ./backend/Dockerfile`, plan `free` (private preview; see §3), region `oregon`, `healthCheckPath: /api/v1/health`, migrations at start-up (`RUN_MIGRATIONS_ON_START=true`), `autoDeployTrigger: "off"`, `maxShutdownDelaySeconds: 120`, `buildFilter` on `backend/**` |
+| `resume-analyzer-db` | PostgreSQL 16 | plan `free` (1 GB, no backups, expires after 30 days), region `oregon`, database `resume_analyzer`, user `resume`, `ipAllowList: []` (no external connections) |
 
 The frontend is deployed to Vercel ([deploy-vercel.md](deploy-vercel.md)); browsers never call the Render
 URL directly.
@@ -34,6 +34,7 @@ URL directly.
 | `WEB_CONCURRENCY` | `1` | One uvicorn process (requests still run concurrently in its thread pool). Raise it on larger plans; Argon2 uses 64 MiB per concurrent login. |
 | `GRACEFUL_SHUTDOWN_SECONDS` | `100` | Lets an in-flight AI request (≤ 90 s) finish on deploy/restart; `maxShutdownDelaySeconds: 120` gives uvicorn that window. |
 | `LOG_LEVEL` | `INFO` | Logs are JSON on stdout (Render's log stream). |
+| `RUN_MIGRATIONS_ON_START` | `true` (free plan only) | The entrypoint runs `python -m app.cli migrate` (advisory-locked) before uvicorn, replacing `preDeployCommand`, which free instances lack. Remove it when moving to a paid plan. |
 | `PORT` | injected by Render | The entrypoint binds `0.0.0.0:$PORT`. |
 
 Optional tuning variables (limits, timeouts, model names) are documented in
@@ -45,8 +46,9 @@ Optional tuning variables (limits, timeouts, model names) are documented in
 2. Render shows the two resources from `render.yaml`. Enter `GEMINI_API_KEY` and `CORS_ORIGINS` when it
    prompts for the `sync: false` values. For `CORS_ORIGINS`, use the Vercel production URL; if it is not
    known yet, enter a placeholder HTTPS origin and update it after step 1 of the Vercel guide.
-3. **Apply**. Render creates the database, builds the image from `backend/Dockerfile`, runs the pre-deploy
-   migration in a one-off instance of the new image, and then starts the service. Deploys stay manual
+3. **Apply**. Render creates the database, builds the image from `backend/Dockerfile`, and starts the
+   service; on the free plan the container migrates at start-up before serving (on paid plans, the
+   pre-deploy migration runs in a one-off instance of the new image first; see §3). Deploys stay manual
    afterwards (`autoDeployTrigger: "off"`).
 4. Copy the generated `BACKEND_ACCESS_KEY` (service → Environment) into Vercel.
 5. Verify (§4).
@@ -56,8 +58,9 @@ can be changed to `checksPass`. That is a deliberate change, not done here.
 
 ## 3. Migrations
 
-- `preDeployCommand: python -m app.cli migrate` runs **once per deploy, before** the new version takes
-  traffic. If it fails, the deploy stops and the previous version keeps serving.
+- Paid plans: `preDeployCommand: python -m app.cli migrate` runs **once per deploy, before** the new version
+  takes traffic. If it fails, the deploy stops and the previous version keeps serving. Free plan (current
+  Blueprint): `RUN_MIGRATIONS_ON_START=true` instead, below.
 - The command holds a PostgreSQL advisory lock for the whole upgrade, so it can never run twice concurrently.
   A second runner waits, then finds nothing to do (tested with four concurrent runners).
 - `AUTO_MIGRATE` is off in production, so web processes never migrate.
@@ -67,9 +70,16 @@ can be changed to `checksPass`. That is a deliberate change, not done here.
   `pg_dump --format=custom "$EXTERNAL_DATABASE_URL"`; external access must then be allowed temporarily in
   `ipAllowList`).
 
-**Free instance types** do not support `preDeployCommand`. On those, remove it and set
-`RUN_MIGRATIONS_ON_START=true`: the entrypoint then migrates (advisory-locked) before uvicorn starts. Free
-web services also sleep when idle, and free databases expire, so they are not suitable for real use.
+**Current Blueprint: free plans (private preview).** Free instance types do not support `preDeployCommand`,
+so `render.yaml` sets `RUN_MIGRATIONS_ON_START=true` instead: the entrypoint migrates (advisory-locked) before
+uvicorn starts. A failed migration means the new instance never becomes healthy, so the deploy fails.
+Free-plan limits (Render docs, checked 2026-11-11): the web service sleeps after 15 idle minutes (~1 min cold
+start) and has no SSH/shell; the database is 1 GB, has **no backups**, and **expires 30 days after creation**
+(deleted after a further 14 days unless upgraded); one free database per workspace. Fictional data only.
+
+**Before real users**, switch to paid plans: web `plan: starter` (or higher), restore
+`preDeployCommand: python -m app.cli migrate`, remove `RUN_MIGRATIONS_ON_START`, and database
+`plan: basic-256mb` (or higher), then configure backups.
 
 ## 4. Verify after deploying
 
@@ -94,7 +104,8 @@ In the service logs, the first lines are the configuration summary (`Configurati
 | Alerts / notifications | Account-level settings. |
 | Retention purge cron job | **Not implemented** in the application (no purge command exists), so no cron job is defined. Users can delete their data and account in the app. |
 
-The plan names (`starter`, `basic-256mb`) and the region are defaults; adjust them before the first apply.
+The plan names (`free` for the private preview; `starter` / `basic-256mb` recommended for real use, see §3)
+and the region are defaults; adjust them before the first apply.
 The database's `region`, `databaseName`, `user` and `postgresMajorVersion` cannot be changed after creation.
 
 ## 6. Troubleshooting

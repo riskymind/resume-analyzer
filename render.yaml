@@ -12,16 +12,18 @@ services:
   - type: web
     name: resume-analyzer-api
     runtime: docker
-    # The pre-deploy command (migrations) needs a paid instance type; see docs/deploy-render.md §5 for free.
-    plan: starter
+    # Private preview runs on the free plan (no billing): sleeps after 15 idle minutes, no pre-deploy command,
+    # no SSH/shell. Before real users: plan starter (or higher), restore preDeployCommand, drop
+    # RUN_MIGRATIONS_ON_START. See docs/deploy-render.md §3.
+    plan: free
     region: oregon
     dockerContext: ./backend
     dockerfilePath: ./backend/Dockerfile
     # Liveness only (no dependencies), so a database blip does not restart the service.
     healthCheckPath: /api/v1/health
-    # Runs once per deploy in a separate instance of the new image, before it receives traffic. A failure
-    # stops the deploy and the previous version keeps serving. Advisory-locked, so it is safe to repeat.
-    preDeployCommand: python -m app.cli migrate
+    # Free instances have no preDeployCommand: migrations run at start-up instead (RUN_MIGRATIONS_ON_START
+    # below). Advisory-locked; if a migration fails the new instance never passes its health check, so the
+    # deploy fails and the previous version keeps serving.
     # No deploy on push; deploy manually (or switch to checksPass once CI is trusted).
     autoDeployTrigger: "off"
     # In-flight AI requests can take up to 90 s; uvicorn gets GRACEFUL_SHUTDOWN_SECONDS of this window.
@@ -62,10 +64,15 @@ services:
         value: "100"
       - key: LOG_LEVEL
         value: INFO
+      # Free plan only (no pre-deploy step): the entrypoint migrates (advisory-locked) before uvicorn starts.
+      - key: RUN_MIGRATIONS_ON_START
+        value: "true"
 
 databases:
   - name: resume-analyzer-db
-    plan: basic-256mb
+    # Free: 1 GB, NO backups, expires 30 days after creation (deleted 14 days later unless upgraded); one
+    # free database per workspace. Fictional test data only. Upgrade (e.g. basic-256mb) before real users.
+    plan: free
     region: oregon
     # databaseName, user, region and postgresMajorVersion cannot be changed after creation.
     databaseName: resume_analyzer
