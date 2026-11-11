@@ -1,0 +1,7 @@
+-r requirements.txt
+pytest==9.2.0
+pytest-cov==7.1.0
+httpx==0.28.1  # tests only; the app must not depend on it (see app/ai/gemini.py)
+ruff==0.17.4
+mypy==2.4.1
+pip-audit==2.10.1

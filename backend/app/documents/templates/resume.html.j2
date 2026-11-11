@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ title }}</title>
+<style>
+@page {
+  size: A4;
+  margin: 15mm 16mm 16mm 16mm;
+  {% if footer_text %}
+  @bottom-right {
+    content: "{{ footer_text | safe }} \2014  page " counter(page) " of " counter(pages);
+    font-family: {{ t.css_font_stack | safe }};
+    font-size: 8pt;
+    color: #6b6f73;
+    vertical-align: top;
+    padding-top: 4mm;
+  }
+  {% endif %}
+}
+/* Continuation pages carry the candidate's name and a page number; the first page does not need one. */
+@page :first { @bottom-right { content: none; } }
+html { -webkit-print-color-adjust: exact; }
+body {
+  margin: 0;
+  font-family: {{ t.css_font_stack | safe }};
+  font-size: {{ t.body_pt }}pt;
+  line-height: {{ t.line_height }};
+  color: #1d1f21;
+  background: #ffffff;
+}
+.page { max-width: 178mm; margin: 0 auto; }
+header { {% if t.centered_header %}text-align: center;{% endif %} margin-bottom: 9pt; }
+h1 { font-size: {{ t.name_pt }}pt; font-weight: 700; margin: 0 0 3pt; color: #{{ t.accent }}; letter-spacing: 0.01em; }
+.contact { font-size: {{ t.body_pt - 1 }}pt; color: #3c4043; margin: 0; }
+.contact a { color: inherit; text-decoration: none; }
+.sep { color: #80868b; }
+section { margin-top: 9pt; }
+h2 {
+  font-size: {{ t.heading_pt }}pt;
+  font-weight: 700;
+  color: #{{ t.accent }};
+  margin: 0 0 4pt;
+  {% if t.heading_upper %}text-transform: uppercase; letter-spacing: 0.06em;{% endif %}
+  {% if t.heading_rule %}padding-bottom: 2pt; border-bottom: 0.75pt solid #{{ t.accent }};{% endif %}
+  break-after: avoid;
+  page-break-after: avoid;
+}
+.entry { margin: 0 0 6pt; }
+.entry-head { break-after: avoid; page-break-after: avoid; break-inside: avoid; }
+.entry-title { font-weight: 700; }
+.entry-sub { color: #3c4043; }
+.dates { float: right; padding-left: 8pt; color: #3c4043; font-size: {{ t.body_pt - 0.5 }}pt; }
+ul { margin: 2pt 0 0; padding-left: 13pt; }
+li { margin: 0 0 1.5pt; break-inside: avoid; page-break-inside: avoid; }
+p { margin: 0 0 3pt; orphans: 2; widows: 2; }
+.skills-line { margin: 0 0 2pt; }
+.label { font-weight: 700; }
+.stack { color: #3c4043; }
+/* Long unbroken strings (URLs, package names) wrap instead of overflowing the page. */
+p, li, .contact, .entry-head { overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<div class="page">
+<header>
+  {% if doc.contact.name %}<h1>{{ doc.contact.name }}</h1>{% endif %}
+  {% if contact_parts %}
+  <p class="contact">{% for part in contact_parts %}{% if not loop.first %}<span class="sep"> | </span>{% endif %}{% if part.href %}<a href="{{ part.href }}">{{ part.text }}</a>{% else %}{{ part.text }}{% endif %}{% endfor %}</p>
+  {% endif %}
+</header>
+{% for section in sections %}
+  {% if section == "summary" and doc.summary %}
+  <section>
+    <h2>{{ titles.summary }}</h2>
+    <p>{{ doc.summary }}</p>
+  </section>
+  {% elif section == "experience" and doc.experience %}
+  <section>
+    <h2>{{ titles.experience }}</h2>
+    {% for entry in doc.experience %}
+    <div class="entry">
+      <div class="entry-head">
+        {% if dates(entry.start_date, entry.end_date) %}<span class="dates">{{ dates(entry.start_date, entry.end_date) }}</span>{% endif %}
+        <span class="entry-title">{{ entry.title or "" }}</span>{% if entry.title and entry.employer %}<span class="entry-sub">, </span>{% endif %}<span class="entry-sub">{{ entry.employer or "" }}</span>{% if entry.location %}<span class="entry-sub"> · {{ entry.location }}</span>{% endif %}
+      </div>
+      {% set bullets = entry.bullets | selectattr("text") | list %}
+      {% if bullets %}
+      <ul>{% for bullet in bullets %}<li>{{ bullet.text }}</li>{% endfor %}</ul>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </section>
+  {% elif section == "projects" and doc.projects %}
+  <section>
+    <h2>{{ titles.projects }}</h2>
+    {% for project in doc.projects %}
+    <div class="entry">
+      <div class="entry-head"><span class="entry-title">{{ project.name or "Project" }}</span></div>
+      {% if t.stack_first and project.technologies %}<p class="stack"><span class="label">{{ t.tech_label }}:</span> {{ project.technologies | join(", ") }}</p>{% endif %}
+      {% if project.description %}<p>{{ project.description }}</p>{% endif %}
+      {% if not t.stack_first and project.technologies %}<p><span class="label">{{ t.tech_label }}:</span> {{ project.technologies | join(", ") }}</p>{% endif %}
+    </div>
+    {% endfor %}
+  </section>
+  {% elif section == "skills" and (doc.technical_skills or doc.soft_skills) %}
+  <section>
+    <h2>{{ titles.skills }}</h2>
+    {% if doc.technical_skills %}<p class="skills-line"><span class="label">Technical:</span> {{ doc.technical_skills | join(", ") }}</p>{% endif %}
+    {% if doc.soft_skills %}<p class="skills-line"><span class="label">Professional:</span> {{ doc.soft_skills | join(", ") }}</p>{% endif %}
+  </section>
+  {% elif section == "education" and doc.education %}
+  <section>
+    <h2>{{ titles.education }}</h2>
+    {% for edu in doc.education %}
+    <div class="entry">
+      <div class="entry-head">
+        {% if dates(edu.start_date, edu.end_date) %}<span class="dates">{{ dates(edu.start_date, edu.end_date) }}</span>{% endif %}
+        <span class="entry-title">{{ degree(edu) }}</span>{% if degree(edu) and edu.institution %}<span class="entry-sub">, </span>{% endif %}<span class="entry-sub">{{ edu.institution or "" }}</span>
+      </div>
+      {% if edu.grade %}<p>{{ edu.grade }}</p>{% endif %}
+      {% if edu.coursework %}<p><span class="label">Relevant coursework:</span> {{ edu.coursework | join(", ") }}</p>{% endif %}
+    </div>
+    {% endfor %}
+  </section>
+  {% elif section == "certifications" and doc.certifications %}
+  <section>
+    <h2>{{ titles.certifications }}</h2>
+    <ul>{% for cert in doc.certifications %}<li>{{ cert_line(cert) }}</li>{% endfor %}</ul>
+  </section>
+  {% elif section == "languages" and doc.languages %}
+  <section>
+    <h2>{{ titles.languages }}</h2>
+    <p>{% for lang in doc.languages %}{{ lang.name }}{% if lang.proficiency %} ({{ lang.proficiency }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+  </section>
+  {% endif %}
+{% endfor %}
+</div>
+</body>
+</html>

@@ -1,0 +1,36 @@
+# TEST ONLY: the production-like stack with the FAKE AI provider instead of Gemini, in its own project
+# (separate containers, network and database volume) on its own port. No AI key is read, no AI credits are used.
+#
+#   POSTGRES_PASSWORD=$(openssl rand -hex 16) \
+#     docker compose -p resume-analyzer-fakeai -f compose.yaml -f compose.fake-ai.yaml up --build -d
+#   # http://localhost:8090 ; upload frontend/e2e/fixtures/jane-doe-resume.md and paste frontend/e2e/fixtures/job.txt
+#   docker compose -p resume-analyzer-fakeai -f compose.yaml -f compose.fake-ai.yaml down --volumes
+#
+# The API image is the `fake-ai` target (production image + test suite + scripts/mock_ai_server.py), which is
+# never deployed; mock_ai_server refuses to run with APP_ENV=production. nginx, PostgreSQL and migrations are the
+# same as in compose.yaml.
+
+services:
+  migrate:
+    build:
+      context: ./backend
+      target: fake-ai
+    image: resume-analyzer-api:fake-ai
+
+  api:
+    build:
+      context: ./backend
+      target: fake-ai
+    image: resume-analyzer-api:fake-ai
+    command:
+      - sh
+      - -c
+      - >-
+        exec python -m scripts.mock_ai_server --host 0.0.0.0 --port 8000 --database-url "$$DATABASE_URL"
+        --allow-origin http://localhost:${FAKE_AI_WEB_PORT:-8090} --allow-origin http://127.0.0.1:${FAKE_AI_WEB_PORT:-8090}
+    environment:
+      GEMINI_API_KEY: ""
+
+  web:
+    ports: !override
+      - "127.0.0.1:${FAKE_AI_WEB_PORT:-8090}:8080"

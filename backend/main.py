@@ -1,33 +1,8 @@
-"""FastAPI app entrypoint: app instance, CORS, router mounting."""
+"""Backward-compatible entry point so ``uvicorn main:app`` keeps working.
 
-from dotenv import load_dotenv
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+The application lives in the ``app`` package; prefer ``uvicorn app.main:app``.
+"""
 
-from database import init_db
-from routes import resume
+from app.main import app
 
-load_dotenv()
-
-app = FastAPI(title="Resume Analyzer API")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.on_event("startup")
-def on_startup() -> None:
-    init_db()
-
-
-app.include_router(resume.router, prefix="/api")
-
-
-@app.get("/api/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+__all__ = ["app"]

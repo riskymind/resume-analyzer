@@ -1,0 +1,3 @@
+Senior Backend Engineer at Globex
+Requirements: 5+ years Python, FastAPI or Django, PostgreSQL, Docker, Kubernetes.
+Nice to have: Terraform, GCP. Bachelor's degree in Computer Science or related field.

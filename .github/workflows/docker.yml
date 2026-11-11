@@ -1,0 +1,160 @@
+# Container images, Compose stacks and deployment manifests. Verification only: images are built locally on the
+# runner and discarded; nothing is pushed to a registry and nothing is deployed. No secrets are used (the database
+# password is generated per run; AI calls go to the fake provider; Gemini is never called).
+name: Docker and deployment config
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  config:
+    name: Validate Compose, Render and Vercel configuration
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compose files (base, dev override, fake-AI override)
+        env:
+          POSTGRES_PASSWORD: config-check-only
+        run: |
+          docker compose config --quiet
+          docker compose -f compose.yaml -f compose.dev.yaml config --quiet
+          docker compose -f compose.yaml -f compose.fake-ai.yaml config --quiet
+          # A missing password must fail loudly instead of starting an unprotected database.
+          if POSTGRES_PASSWORD='' docker compose config --quiet 2>/dev/null; then echo 'check failed'; exit 1; fi
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: render.yaml and vercel.json against the providers' published JSON schemas
+        run: |
+          pip install --quiet jsonschema==4.26.0 pyyaml==6.0.3
+          curl -fsSL -o /tmp/render.schema.json https://render.com/schema/render.yaml.json
+          curl -fsSL -o /tmp/vercel.schema.json https://openapi.vercel.sh/vercel.json
+          python - <<'EOF'
+          import json, sys, yaml, jsonschema
+          failed = False
+          for name, path, load in [("render", "render.yaml", yaml.safe_load), ("vercel", "frontend/vercel.json", json.load)]:
+              schema = json.load(open(f"/tmp/{name}.schema.json"))
+              validator = jsonschema.validators.validator_for(schema)(schema)
+              errors = list(validator.iter_errors(load(open(path))))
+              print(f"{path}: {'OK' if not errors else 'INVALID'}")
+              for error in errors:
+                  failed = True
+                  print("  ", list(error.absolute_path), error.message)
+          sys.exit(failed)
+          EOF
+      - name: No secrets or deployment triggers in the manifests
+        run: |
+          if grep -nE '(sk-|AIza)[A-Za-z0-9_-]{10,}' render.yaml frontend/vercel.json compose*.yaml; then echo 'check failed'; exit 1; fi
+          grep -q 'autoDeployTrigger: "off"' render.yaml
+
+  images:
+    name: Build images, run the stack, browser journey (fake AI)
+    runs-on: ubuntu-24.04
+    needs: config
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build production images
+        run: |
+          docker build -t resume-analyzer-api:local backend
+          docker build -t resume-analyzer-web:local frontend
+          docker image ls resume-analyzer-api:local
+          docker image ls resume-analyzer-web:local
+
+      - name: Production API image checks (non-root, no test code, start-up refusal, production mode)
+        run: |
+          set -eu
+          test "$(docker run --rm --entrypoint id resume-analyzer-api:local -u)" = "10001"
+          test "$(docker run --rm --entrypoint id resume-analyzer-web:local -u)" = "101"
+          if docker run --rm --entrypoint sh resume-analyzer-api:local -c 'test -e /app/tests || test -e /app/.env || ls /app/data/*.db 2>/dev/null | grep -q .'; then echo 'check failed'; exit 1; fi
+          # Missing production configuration: exit 1 with a readable message, no traceback.
+          out=$(docker run --rm resume-analyzer-api:local 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q 'Configuration error'
+          echo "$out" | grep -q 'BACKEND_ACCESS_KEY must be set in production'   # fails closed without the key
+          if echo "$out" | grep -q Traceback; then echo 'check failed'; exit 1; fi
+          # Complete production configuration (placeholder AI key; no AI endpoint is called) must start and serve.
+          docker network create ra-ci
+          docker run -d --name ra-ci-db --network ra-ci -e POSTGRES_PASSWORD=ci-throwaway postgres:16.15-alpine
+          until docker exec ra-ci-db pg_isready -U postgres -q; do sleep 1; done
+          KEY=$(openssl rand -hex 32)
+          docker run --rm --network ra-ci -e DATABASE_URL=postgres://postgres:ci-throwaway@ra-ci-db:5432/postgres \
+            -e GEMINI_API_KEY=placeholder -e CORS_ORIGINS=https://ci.example.com -e BACKEND_ACCESS_KEY="$KEY" \
+            resume-analyzer-api:local python -m app.cli migrate
+          docker run -d --name ra-ci-api --network ra-ci -e DATABASE_URL=postgres://postgres:ci-throwaway@ra-ci-db:5432/postgres \
+            -e GEMINI_API_KEY=placeholder -e CORS_ORIGINS=https://ci.example.com -e BACKEND_ACCESS_KEY="$KEY" \
+            resume-analyzer-api:local
+          for _ in $(seq 1 30); do [ "$(docker inspect -f '{{.State.Health.Status}}' ra-ci-api)" = healthy ] && break; sleep 2; done
+          docker logs ra-ci-api
+          test "$(docker inspect -f '{{.State.Health.Status}}' ra-ci-api)" = healthy
+          docker exec -e KEY="$KEY" ra-ci-api python -c "
+          import os, urllib.request, urllib.error
+          def status(path, key):
+              req = urllib.request.Request('http://127.0.0.1:8000' + path, headers={'X-Backend-Access-Key': key} if key else {})
+              try: return urllib.request.urlopen(req).status
+              except urllib.error.HTTPError as e: return e.code
+          assert status('/api/v1/health', None) == 200
+          assert status('/api/health', None) == 403
+          assert status('/api/v1/health/ready', None) == 403
+          assert status('/api/v1/health/ready', os.environ['KEY']) == 200
+          assert status('/api/docs', os.environ['KEY']) == 404
+          print('production mode OK')"
+          docker rm -f ra-ci-api ra-ci-db && docker network rm ra-ci
+
+      - name: No backend secret or URL in the frontend bundle
+        run: |
+          docker run --rm --entrypoint sh resume-analyzer-web:local -c \
+            'if grep -rlE "BACKEND_ACCESS_KEY|x-backend-access-key|GEMINI|onrender\.com|DATABASE_URL" /usr/share/nginx/html; then exit 1; fi'
+
+      - name: Start the production-like stack with the fake AI provider
+        run: |
+          echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
+      - run: docker compose -p ra-fakeai -f compose.yaml -f compose.fake-ai.yaml up --build -d --wait --wait-timeout 300
+      - run: docker compose -p ra-fakeai -f compose.yaml -f compose.fake-ai.yaml ps -a
+      - name: Smoke test through nginx (routing, auth, CSRF, upload, job, match, rewrite, 5 templates x PDF/DOCX)
+        run: python3 -I scripts/smoke_test_stack.py http://localhost:8090
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      # Same journey as the Frontend workflow, but against the containers (nginx -> API -> PostgreSQL).
+      - name: Browser journey against the Compose stack
+        run: npm run test:e2e
+        working-directory: frontend
+        env:
+          CI: 'true'
+          E2E_BASE_URL: http://localhost:8090
+
+      - name: Container logs contain no errors or leaked data
+        if: always()
+        run: |
+          docker compose -p ra-fakeai -f compose.yaml -f compose.fake-ai.yaml logs --no-color > compose.log 2>&1
+          wc -l compose.log
+          if grep -nE 'Traceback|"level": "ERROR"|\[emerg\]' compose.log; then echo 'check failed'; exit 1; fi
+          if grep -nF "$POSTGRES_PASSWORD" compose.log; then echo 'check failed'; exit 1; fi
+          if grep -niE 'csrf_token|ra_session=|correct horse' compose.log; then echo 'check failed'; exit 1; fi
+      - name: Stop and delete the throwaway stack
+        if: always()
+        run: docker compose -p ra-fakeai -f compose.yaml -f compose.fake-ai.yaml down --volumes
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: compose-logs-and-playwright-report
+          path: |
+            compose.log
+            frontend/playwright-report
+            frontend/test-results
+          retention-days: 7

@@ -1,0 +1,99 @@
+# Resume Analyzer: production-like local stack (production images, PostgreSQL, no source mounts).
+#
+#   cp .env.example .env          # then set POSTGRES_PASSWORD (and GEMINI_API_KEY for AI features)
+#   docker compose up --build     # http://localhost:8080
+#
+# Development (hot reload, source mounts):  docker compose -f compose.yaml -f compose.dev.yaml up --build
+# Isolated fake-AI check (no credentials):  see compose.fake-ai.yaml
+# Stop, keeping data:                       docker compose down
+# Delete ALL local data (irreversible):     docker compose down --volumes
+#
+# Full guide: docs/deploy-docker.md. No credentials live in this file; they come from the untracked .env.
+
+name: resume-analyzer
+
+x-api-build: &api-build
+  context: ./backend
+  target: production
+
+services:
+  db:
+    image: postgres:16.15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-resume}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}
+      POSTGRES_DB: ${POSTGRES_DB:-resume_analyzer}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [data]
+    # Not published to the host. compose.dev.yaml publishes it on 127.0.0.1 for local tools.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # One-shot: applies migrations, then exits. The API starts only after it succeeded, so migrations never
+  # run concurrently from several workers. Re-run any time: docker compose run --rm migrate
+  migrate:
+    build: *api-build
+    image: resume-analyzer-api:local
+    command: ["python", "-m", "app.cli", "migrate"]
+    restart: "no"
+    environment: &api-env
+      APP_ENV: development   # production mode requires HTTPS origins; see docs/deploy-docker.md §4
+      LOG_FORMAT: json
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      AUTO_MIGRATE: "false"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-resume}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-resume_analyzer}
+      CORS_ORIGINS: http://localhost:${WEB_PORT:-8080},http://127.0.0.1:${WEB_PORT:-8080}
+      COOKIE_SECURE: "false"
+      # Blank = AI features answer 503 "not configured"; everything else works.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.6-flash}
+      # Only nginx (web) can reach the API, and it overwrites X-Forwarded-For.
+      FORWARDED_ALLOW_IPS: "*"
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [data]
+
+  api:
+    build: *api-build
+    image: resume-analyzer-api:local
+    restart: unless-stopped
+    environment: *api-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks: [data, web]
+    # Not published: reached only through nginx. compose.dev.yaml publishes 127.0.0.1:8000.
+    stop_grace_period: 30s
+
+  web:
+    build:
+      context: ./frontend
+      target: runtime
+    image: resume-analyzer-web:local
+    restart: unless-stopped
+    environment:
+      API_UPSTREAM: http://api:8000
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [web]
+
+volumes:
+  pgdata:
+
+networks:
+  # The database network has no outside access at all.
+  data:
+    internal: true
+  # API egress (Gemini) and the published web port.
+  web:
