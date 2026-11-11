@@ -12,6 +12,16 @@ from app.core.config import Settings
 PG = "postgresql://user:pw@db.example.com:5432/app"
 
 
+@pytest.fixture(autouse=True)
+def _isolate_settings_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Settings reads process env vars even with ``_env_file=None``; drop them so defaults are tested.
+
+    CI's PostgreSQL job exports DATABASE_URL, which otherwise leaks into every ``build()`` below.
+    """
+    for name in Settings.model_fields:
+        monkeypatch.delenv(name.upper(), raising=False)
+
+
 def build(**values: Any) -> Settings:
     return Settings(_env_file=None, **values)
 
