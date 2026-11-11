@@ -1,0 +1,26 @@
+# Keep secrets, local data and tooling caches out of the build context (and therefore out of every image).
+.env
+.env.*
+!.env.example
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Local virtualenvs and caches
+venv/
+.venv/
+resumenv/
+**/__pycache__/
+*.pyc
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Not needed in any image
+Dockerfile
+.dockerignore
+*.md
+.git

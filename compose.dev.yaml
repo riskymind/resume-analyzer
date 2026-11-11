@@ -1,0 +1,53 @@
+# Development override: hot reload with bind-mounted source.
+#
+#   docker compose -f compose.yaml -f compose.dev.yaml up --build
+#
+#   http://localhost:5173   Vite dev server (proxies /api to the api container)
+#   http://localhost:8000   API (docs at /api/docs)
+#   localhost:5433          PostgreSQL, for psql/IDE tools (user/db from .env)
+#
+# All ports bind to 127.0.0.1 only.
+
+services:
+  db:
+    # Docker cannot publish a port of a container attached only to an internal network, so in development
+    # the database also joins "web" (still bound to 127.0.0.1 on the host).
+    networks: [data, web]
+    ports:
+      - "127.0.0.1:${DB_PORT:-5433}:5432"
+
+  migrate:
+    environment:
+      LOG_FORMAT: text
+    volumes:
+      - ./backend/app:/app/app:ro
+
+  api:
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app/app"]
+    environment:
+      LOG_FORMAT: text
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+    volumes:
+      - ./backend/app:/app/app:ro
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+
+  web:
+    build:
+      context: ./frontend
+      target: dev
+    image: resume-analyzer-web:dev
+    environment:
+      API_PROXY_TARGET: http://api:8000
+    volumes:
+      - ./frontend:/app
+      # Keep the container's own (Linux) node_modules instead of the host's.
+      - /app/node_modules
+    ports: !override
+      - "127.0.0.1:${DEV_WEB_PORT:-5173}:5173"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5173/"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 20s

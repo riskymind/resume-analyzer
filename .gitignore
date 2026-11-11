@@ -1,16 +1,30 @@
 # Python
 backend/venv/
 backend/resumenv
+backend/.venv/
 backend/__pycache__/
 backend/**/__pycache__/
 *.pyc
 backend/.env
+# Docker Compose settings (copied from .env.example)
+/.env
+.env.local
+backend/.coverage
+backend/htmlcov/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
 
 # Node
 frontend/node_modules/
 frontend/dist/
+frontend/.env.local
+frontend/test-results/
+frontend/playwright-report/
+frontend/.vercel/
 
-# Database (created at runtime)
+# Runtime data (SQLite database, local uploads)
+backend/data/
 resume_analyzer.db
 
 # Editor/OS
