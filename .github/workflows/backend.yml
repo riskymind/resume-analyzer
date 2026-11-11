@@ -1,0 +1,108 @@
+# Backend checks. Verification only: nothing is built for release, published or deployed.
+# No secrets are used: AI calls go to the test suite's fake provider, and the PostgreSQL service is a throwaway
+# CI container whose password exists only for the lifetime of the job.
+name: Backend
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: backend
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: '1'
+  # WeasyPrint (PDF export) and the template fonts, as in backend/Dockerfile.
+  PDF_PACKAGES: >-
+    libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libharfbuzz-subset0
+    fonts-liberation fonts-crosextra-carlito fonts-crosextra-caladea fonts-dejavu-core
+
+jobs:
+  lint:
+    name: Ruff, format, strict mypy, dependency audit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: mypy app tests scripts
+      - run: ruff check --config pyproject.toml ../scripts && mypy --strict ../scripts/smoke_test_stack.py
+      - name: Known vulnerabilities in runtime dependencies
+        run: pip-audit -r requirements.txt --strict --progress-spinner off
+
+  test-sqlite:
+    name: Tests (SQLite)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - name: System libraries for PDF export
+        run: |
+          # shellcheck disable=SC2086 # PDF_PACKAGES is a deliberate word list
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends $PDF_PACKAGES
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -q
+
+  test-postgres:
+    name: Tests and migrations (PostgreSQL 16)
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16.15-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci-throwaway
+          POSTGRES_DB: ra_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ci -d ra_ci" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://ci:ci-throwaway@localhost:5432/ra_ci
+      DATABASE_URL: postgresql://ci:ci-throwaway@localhost:5432/ra_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - name: System libraries for PDF export
+        run: |
+          # shellcheck disable=SC2086 # PDF_PACKAGES is a deliberate word list
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends $PDF_PACKAGES
+      - run: pip install -r requirements-dev.txt
+      # The suite drops and recreates the schema for every app instance and includes the advisory-lock test.
+      - run: pytest -q
+      - name: Migrations from an empty database, model drift, full downgrade/upgrade round trip
+        run: |
+          python - <<'EOF'
+          import os, sqlalchemy as sa
+          engine = sa.create_engine(os.environ["DATABASE_URL"].replace("postgresql://", "postgresql+psycopg://", 1))
+          with engine.begin() as connection:
+              connection.execute(sa.text("DROP SCHEMA public CASCADE; CREATE SCHEMA public"))
+          EOF
+          python -m app.cli migrate
+          python -m app.cli migrate | grep -q 'Already up to date'
+          alembic check
+          alembic downgrade base
+          alembic upgrade head
+          test "$(alembic current 2>/dev/null | awk '{print $1}')" = "$(alembic heads 2>/dev/null | awk '{print $1}')"
