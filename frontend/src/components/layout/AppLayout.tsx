@@ -54,8 +54,12 @@ export default function AppLayout() {
     if (!interacted.current) return
     // Wait a frame so the new page (and its heading) is in the DOM.
     const frame = requestAnimationFrame(() => {
-      const heading = mainRef.current?.querySelector<HTMLElement>('h1')
-      ;(heading ?? mainRef.current)?.focus({ preventScroll: false })
+      const main = mainRef.current
+      // If the user already focused something on the new page (e.g. started typing into a form), leave it there.
+      const active = document.activeElement
+      if (main && active && active !== main && main.contains(active)) return
+      const heading = main?.querySelector<HTMLElement>('h1')
+      ;(heading ?? main)?.focus({ preventScroll: false })
     })
     return () => cancelAnimationFrame(frame)
   }, [location.pathname])

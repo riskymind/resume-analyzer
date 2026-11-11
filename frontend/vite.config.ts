@@ -22,8 +22,6 @@ export default defineConfig(({ mode }) => {
       setupFiles: ['./src/test/setup.ts'],
       include: ['src/**/*.test.{js,jsx,ts,tsx}'],
       restoreMocks: true,
-      // Several 5 s findBy* waits can run in one test (see src/test/setup.ts).
-      testTimeout: 15000,
       css: false,
     },
   }

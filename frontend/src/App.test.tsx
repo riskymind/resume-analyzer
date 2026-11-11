@@ -115,6 +115,18 @@ describe('sessions', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument()
   })
 
+  it('does not pull focus away from a field the user focused before the post-navigation focus runs', async () => {
+    // Regression: after sign-out the layout focuses the new page's <h1> one animation frame later. Someone who
+    // clicked into Email first lost focus mid-typing (seen as a CI-only failure of the test above).
+    signedIn({ ...EMPTY_LISTS, 'POST /v1/auth/logout': () => new Response(null, { status: 204 }) })
+    renderApp('/account')
+    await userEvent.click(await screen.findByRole('button', { name: 'Sign out' }))
+    const email = await screen.findByLabelText('Email')
+    email.focus()
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    expect(email).toHaveFocus()
+  })
+
   it('validates the registration form accessibly before calling the server', async () => {
     const api = signedOut()
     renderApp('/login')
