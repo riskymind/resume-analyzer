@@ -14,7 +14,7 @@ The Blueprint [`render.yaml`](../render.yaml) defines:
 
 | Resource | Type | Key settings |
 |---|---|---|
-| `resume-analyzer-api` | Web service, `runtime: docker` | `dockerContext: ./backend`, `dockerfilePath: ./backend/Dockerfile`, plan `free` (private preview; see §3), region `oregon`, `healthCheckPath: /api/v1/health`, migrations at start-up (`RUN_MIGRATIONS_ON_START=true`), `autoDeployTrigger: "off"`, `maxShutdownDelaySeconds: 120`, `buildFilter` on `backend/**` |
+| `resume-analyzer-api` | Web service, `runtime: docker` | `dockerContext: ./backend`, `dockerfilePath: ./backend/Dockerfile`, plan `free` (private preview; see §3), region `oregon`, `healthCheckPath: /api/v1/health`, migrations at start-up (`RUN_MIGRATIONS_ON_START=true`), `autoDeployTrigger: "off"`, default 30 s shutdown delay (`maxShutdownDelaySeconds` is not supported on free), `buildFilter` on `backend/**` |
 | `resume-analyzer-db` | PostgreSQL 16 | plan `free` (1 GB, no backups, expires after 30 days), region `oregon`, database `resume_analyzer`, user `resume`, `ipAllowList: []` (no external connections) |
 
 The frontend is deployed to Vercel ([deploy-vercel.md](deploy-vercel.md)); browsers never call the Render
@@ -32,7 +32,7 @@ URL directly.
 | `BACKEND_ACCESS_KEY` | `generateValue: true` (**secret**) | **Required in production**: without it the API refuses to start (fail closed). Generated once by Render when the Blueprint is first applied; never hard-coded. Copy it into the Vercel project as a server-only variable. The API answers 403 to anything that does not carry it; the only exception is the liveness probe `/api/v1/health`. |
 | `FORWARDED_ALLOW_IPS` | `*` | uvicorn trusts `X-Forwarded-For`. Safe only because the access key guarantees every request came through Vercel, which overwrites that header with the real client IP. Per-IP login/registration limits depend on it. |
 | `WEB_CONCURRENCY` | `1` | One uvicorn process (requests still run concurrently in its thread pool). Raise it on larger plans; Argon2 uses 64 MiB per concurrent login. |
-| `GRACEFUL_SHUTDOWN_SECONDS` | `100` | Lets an in-flight AI request (≤ 90 s) finish on deploy/restart; `maxShutdownDelaySeconds: 120` gives uvicorn that window. |
+| `GRACEFUL_SHUTDOWN_SECONDS` | `25` (free plan) | Must fit Render's default 30 s SIGTERM→SIGKILL window, because free services cannot set `maxShutdownDelaySeconds`. An AI request still running at shutdown (they can take up to 90 s) may be cut off; the client sees an error and can retry. On paid plans use `100` with `maxShutdownDelaySeconds: 120`. |
 | `LOG_LEVEL` | `INFO` | Logs are JSON on stdout (Render's log stream). |
 | `RUN_MIGRATIONS_ON_START` | `true` (free plan only) | The entrypoint runs `python -m app.cli migrate` (advisory-locked) before uvicorn, replacing `preDeployCommand`, which free instances lack. Remove it when moving to a paid plan. |
 | `PORT` | injected by Render | The entrypoint binds `0.0.0.0:$PORT`. |
@@ -78,7 +78,8 @@ start) and has no SSH/shell; the database is 1 GB, has **no backups**, and **exp
 (deleted after a further 14 days unless upgraded); one free database per workspace. Fictional data only.
 
 **Before real users**, switch to paid plans: web `plan: starter` (or higher), restore
-`preDeployCommand: python -m app.cli migrate`, remove `RUN_MIGRATIONS_ON_START`, and database
+`preDeployCommand: python -m app.cli migrate`, remove `RUN_MIGRATIONS_ON_START`, restore
+`maxShutdownDelaySeconds: 120` with `GRACEFUL_SHUTDOWN_SECONDS=100`, and database
 `plan: basic-256mb` (or higher), then configure backups.
 
 ## 4. Verify after deploying

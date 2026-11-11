@@ -26,8 +26,9 @@ services:
     # deploy fails and the previous version keeps serving.
     # No deploy on push; deploy manually (or switch to checksPass once CI is trusted).
     autoDeployTrigger: "off"
-    # In-flight AI requests can take up to 90 s; uvicorn gets GRACEFUL_SHUTDOWN_SECONDS of this window.
-    maxShutdownDelaySeconds: 120
+    # maxShutdownDelaySeconds is not supported on free services, so Render's default 30 s SIGTERM->SIGKILL
+    # window applies; GRACEFUL_SHUTDOWN_SECONDS is 25 to fit it. On paid plans restore
+    # maxShutdownDelaySeconds: 120 with GRACEFUL_SHUTDOWN_SECONDS "100" (AI requests can take up to 90 s).
     numInstances: 1
     buildFilter:
       paths:
@@ -60,8 +61,9 @@ services:
         value: "*"
       - key: WEB_CONCURRENCY
         value: "1"
+      # Free plan: must stay below Render's default 30 s shutdown delay (see maxShutdownDelaySeconds note).
       - key: GRACEFUL_SHUTDOWN_SECONDS
-        value: "100"
+        value: "25"
       - key: LOG_LEVEL
         value: INFO
       # Free plan only (no pre-deploy step): the entrypoint migrates (advisory-locked) before uvicorn starts.
