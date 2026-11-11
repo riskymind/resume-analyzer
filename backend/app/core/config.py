@@ -47,6 +47,10 @@ class Settings(BaseSettings):
 
     # --- AI provider -------------------------------------------------------
     ai_provider: Literal["gemini"] = "gemini"
+    # Operator kill switch. False: no AI client is built, so no request reaches the provider (generation or
+    # embeddings) even with a key configured; AI routes answer 503 and readiness reports "disabled".
+    # Lets a deployment hold its production key while live AI usage awaits authorization.
+    ai_calls_enabled: bool = True
     gemini_api_key: SecretStr | None = None
     gemini_model: str = "gemini-3.6-flash"
     ai_timeout_seconds: float = Field(default=60, gt=0, le=300)

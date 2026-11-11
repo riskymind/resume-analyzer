@@ -71,7 +71,9 @@ def get_embedding_provider(request: Request) -> EmbeddingProvider | None:
 
 def require_ai_provider(provider: AIProvider | None) -> AIProvider:
     if provider is None:
-        raise AIUnavailableError("AI analysis is not configured on this server (GEMINI_API_KEY is not set).")
+        raise AIUnavailableError(
+            "AI analysis is not available on this server (GEMINI_API_KEY is not set or AI_CALLS_ENABLED is false)."
+        )
     return provider
 
 

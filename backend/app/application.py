@@ -87,7 +87,11 @@ def create_app(settings: Settings | None = None, *, ai_provider: AIProvider | No
     app.state.settings = settings
     app.state.db = database
     app.state.rate_limiter = RateLimiter(database)
-    app.state.ai_provider = ai_provider if ai_provider is not None else build_ai_provider(settings)
+    # AI_CALLS_ENABLED=false wins over everything, including an injected provider.
+    if not settings.ai_calls_enabled:
+        app.state.ai_provider = None
+    else:
+        app.state.ai_provider = ai_provider if ai_provider is not None else build_ai_provider(settings)
     # The configured provider doubles as the embedding provider when it supports embeddings.
     app.state.embedding_provider = (
         app.state.ai_provider if isinstance(app.state.ai_provider, EmbeddingProvider) else None

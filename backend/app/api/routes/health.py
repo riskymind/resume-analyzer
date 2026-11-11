@@ -36,8 +36,11 @@ def ready(request: Request, database: Annotated[Database, Depends(get_database)]
         logger.warning("readiness_db_failed", extra={"error_type": type(exc).__name__})
         checks["database"] = "unavailable"
 
-    checks["ai_provider"] = "ok" if request.app.state.ai_provider is not None else "not_configured"
-    healthy = all(value == "ok" for value in checks.values())
+    if not request.app.state.settings.ai_calls_enabled:
+        checks["ai_provider"] = "disabled"  # deliberate operator choice (AI_CALLS_ENABLED=false), not a fault
+    else:
+        checks["ai_provider"] = "ok" if request.app.state.ai_provider is not None else "not_configured"
+    healthy = all(value in ("ok", "disabled") for value in checks.values())
     return JSONResponse(
         status_code=200 if healthy else 503, content={"status": "ok" if healthy else "degraded", "checks": checks}
     )

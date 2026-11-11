@@ -31,6 +31,7 @@ def test_development_defaults_use_sqlite_and_auto_migrate() -> None:
     assert settings.is_sqlite
     assert settings.effective_auto_migrate is True
     assert settings.effective_log_format == "text"
+    assert settings.ai_calls_enabled is True  # kill switch is opt-in; existing deployments keep AI on
 
 
 @pytest.mark.parametrize(

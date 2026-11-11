@@ -42,6 +42,10 @@ services:
           property: connectionString
       - key: GEMINI_API_KEY
         sync: false
+      # Kill switch: "false" holds the key but makes no Gemini calls (AI routes answer 503). Set it to "true"
+      # in the dashboard only when live AI usage is authorized; re-syncing this Blueprint resets it to "false".
+      - key: AI_CALLS_ENABLED
+        value: "false"
       # The public HTTPS origin(s) of the Vercel frontend, comma-separated, e.g. https://resume-analyzer.vercel.app
       - key: CORS_ORIGINS
         sync: false

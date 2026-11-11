@@ -131,6 +131,31 @@ class TestAIConfiguration:
         assert res.status_code == 503
         assert res.json()["error"]["code"] == "ai_not_configured"
 
+    def test_kill_switch_blocks_ai_even_with_a_provider(self, tmp_path: Path) -> None:
+        fake = FakeLLM()
+        settings = make_settings(tmp_path, ai_calls_enabled=False, gemini_api_key="configured-but-off")
+        application = create_app(settings, ai_provider=fake)
+        assert application.state.ai_provider is None
+        assert application.state.embedding_provider is None
+        with TestClient(application) as test_client:
+            sign_up(test_client)
+            res = _analyze(test_client)
+        assert res.status_code == 503
+        assert res.json()["error"]["code"] == "ai_not_configured"
+        assert fake.call_count == 0
+        assert fake.embed_calls == []
+
+    def test_kill_switch_keeps_readiness_healthy(self, tmp_path: Path) -> None:
+        settings = make_settings(tmp_path, ai_calls_enabled=False, gemini_api_key="configured-but-off")
+        with TestClient(create_app(settings, ai_provider=FakeLLM())) as test_client:
+            res = test_client.get("/api/v1/health/ready")
+        assert res.status_code == 200
+        assert res.json()["checks"] == {"database": "ok", "ai_provider": "disabled"}
+
+    def test_kill_switch_does_not_build_a_gemini_client(self, tmp_path: Path) -> None:
+        settings = make_settings(tmp_path, ai_calls_enabled=False, gemini_api_key="configured-but-off")
+        assert create_app(settings).state.ai_provider is None
+
     def test_invalid_upload_reported_before_missing_ai_key(self, tmp_path: Path) -> None:
         with TestClient(create_app(make_settings(tmp_path))) as test_client:
             sign_up(test_client)
