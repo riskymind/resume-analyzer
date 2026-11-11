@@ -1,0 +1,50 @@
+[project]
+name = "resume-analyzer-backend"
+version = "2.0.0.dev0"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = ["venv", "resumenv", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "BLE", "SIM", "RUF", "N", "C4", "PT"]
+ignore = [
+  "S101",   # assert is used for test assertions and type narrowing
+  "BLE001", # broad excepts are deliberate at provider/parser boundaries and are re-raised as typed errors
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106", "S108", "N801", "RUF001"]  # sample resumes use real-world en dashes
+"app/db/migrations/**" = ["N999"]
+"app/services/scoring/lexicon.py" = ["SIM905"]  # word lists kept as readable text blocks
+"app/services/matching/engine.py" = ["SIM905"]
+"app/services/rewriting/verification.py" = ["SIM905"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "tests"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+exclude = ["^venv/", "^resumenv/", "^\\.venv/"]
+
+[[tool.mypy.overrides]]
+module = ["weasyprint", "weasyprint.*"]  # ships no type information
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider --strict-markers"
+filterwarnings = ["error::DeprecationWarning:app.*"]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/db/migrations/*"]

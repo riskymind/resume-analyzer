@@ -1,7 +1,26 @@
-fastapi==0.115.0
-uvicorn[standard]==0.30.6
-python-dotenv==1.0.1
-google-generativeai==0.8.3
-pydantic==2.9.2
-pypdf==5.0.1
-python-multipart==0.0.9
+# Runtime dependencies (pinned). Python 3.11+.
+fastapi==0.162.2
+uvicorn[standard]==0.54.0
+pydantic==2.14.3
+pydantic-settings==2.16.2
+python-dotenv==1.2.4
+python-multipart==0.0.33
+pypdf==7.0.0
+google-genai==3.0.0
+# google-genai's default HTTP client; app/ai/gemini.py classifies its timeout/transport errors.
+httpx2==2.16.0
+sqlalchemy==2.1.8
+alembic==1.20.1
+psycopg[binary]==3.3.8
+argon2-cffi==25.1.0
+# Resume exports (Milestone 5). WeasyPrint needs the Pango system library
+# (libpango-1.0-0, libpangoft2-1.0-0, libharfbuzz0b + fonts); see docs/rewriting.md.
+weasyprint==70.0
+python-docx==1.2.0
+jinja2==3.1.6
+# Transitive (google-genai -> google-auth); pinned to a patched release.
+# cryptography >= 49 publishes no wheels for Intel macOS, so that platform keeps
+# the resolver's choice for local development only. Docker, Render and CI
+# (Linux) always get the patched version. With API-key auth, google-auth does
+# not invoke cryptography's affected code paths.
+cryptography==50.0.2; sys_platform != "darwin" or platform_machine != "x86_64"
